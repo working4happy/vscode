@@ -50,7 +50,7 @@ export async function fetchUrl(url: string, options: IFetchOptions, retries = 10
 			startTime = new Date().getTime();
 		}
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 30 * 1000);
+		const timeout = setTimeout(() => controller.abort(), 300 * 1000);
 		try {
 			const response = await fetch(url, {
 				...options.nodeFetchOptions,
