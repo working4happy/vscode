@@ -25,7 +25,7 @@ import { TextEdit } from 'vs/editor/common/languages';
 import { IValidEditOperation } from 'vs/editor/common/model';
 import { IEditorWorkerService } from 'vs/editor/common/services/editorWorker';
 import { DefaultModelSHA1Computer } from 'vs/editor/common/services/modelService';
-import { InlineCompletionsController } from 'vs/editor/contrib/inlineCompletions/browser/inlineCompletionsController';
+import { InlineCompletionsController } from 'vs/editor/contrib/inlineCompletions/browser/controller/inlineCompletionsController';
 import { MessageController } from 'vs/editor/contrib/message/browser/messageController';
 import { localize } from 'vs/nls';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
@@ -39,9 +39,9 @@ import { ChatAgentLocation } from 'vs/workbench/contrib/chat/common/chatAgents';
 import { ChatModel, ChatRequestRemovalReason, IChatRequestModel, IChatTextEditGroup, IChatTextEditGroupState, IResponse } from 'vs/workbench/contrib/chat/common/chatModel';
 import { IChatService } from 'vs/workbench/contrib/chat/common/chatService';
 import { InlineChatContentWidget } from 'vs/workbench/contrib/inlineChat/browser/inlineChatContentWidget';
-import { Session, StashedSession } from 'vs/workbench/contrib/inlineChat/browser/inlineChatSession';
+import { HunkInformation, Session, StashedSession } from 'vs/workbench/contrib/inlineChat/browser/inlineChatSession';
 import { InlineChatError } from 'vs/workbench/contrib/inlineChat/browser/inlineChatSessionServiceImpl';
-import { EditModeStrategy, IEditObserver, LiveStrategy, PreviewStrategy, ProgressingEditsOptions } from 'vs/workbench/contrib/inlineChat/browser/inlineChatStrategies';
+import { EditModeStrategy, HunkAction, IEditObserver, LiveStrategy, PreviewStrategy, ProgressingEditsOptions } from 'vs/workbench/contrib/inlineChat/browser/inlineChatStrategies';
 import { CTX_INLINE_CHAT_EDITING, CTX_INLINE_CHAT_REQUEST_IN_PROGRESS, CTX_INLINE_CHAT_RESPONSE_TYPE, CTX_INLINE_CHAT_SUPPORT_REPORT_ISSUE, CTX_INLINE_CHAT_USER_DID_EDIT, CTX_INLINE_CHAT_VISIBLE, EditMode, INLINE_CHAT_ID, InlineChatConfigKeys, InlineChatResponseType } from 'vs/workbench/contrib/inlineChat/common/inlineChat';
 import { INotebookEditorService } from 'vs/workbench/contrib/notebook/browser/services/notebookEditorService';
 import { IEditorService, SIDE_GROUP } from 'vs/workbench/services/editor/common/editorService';
@@ -752,17 +752,14 @@ export class InlineChatController implements IEditorContribution {
 
 		let newPosition: Position | undefined;
 
-		if (response.response.value.length === 0) {
+		if (response.result?.errorDetails) {
+			//
+			await this._session.undoChangesUntil(response.requestId);
+
+		} else if (response.response.value.length === 0) {
 			// empty -> show message
 			const status = localize('empty', "No results, please refine your input and try again");
 			this._ui.value.zone.widget.updateStatus(status, { classes: ['warn'] });
-
-		} else if (response.result?.errorDetails) {
-			// error -> show error
-			if (!response.isCanceled) {
-				this._ui.value.zone.widget.updateStatus(response.result.errorDetails.message, { classes: ['error'] });
-			}
-			this._strategy?.cancel();
 
 		} else {
 			// real response -> complex...
@@ -872,7 +869,7 @@ export class InlineChatController implements IEditorContribution {
 		}
 
 		if (this._session && !position && (this._session.hasChangedText || this._session.chatModel.hasRequests)) {
-			widgetPosition = this._session.wholeRange.value.getStartPosition().delta(-1);
+			widgetPosition = this._session.wholeRange.trackedInitialRange.getStartPosition().delta(-1);
 		}
 
 		if (!headless) {
@@ -921,7 +918,7 @@ export class InlineChatController implements IEditorContribution {
 
 		let responseType = InlineChatResponseType.None;
 		for (const request of this._session.chatModel.getRequests()) {
-			if (!request.response) {
+			if (!request.response || request.response.isCanceled) {
 				continue;
 			}
 			responseType = InlineChatResponseType.Messages;
@@ -1029,10 +1026,6 @@ export class InlineChatController implements IEditorContribution {
 		return this._ui.value.zone.widget.hasFocus();
 	}
 
-	moveHunk(next: boolean) {
-		this.focus();
-		this._strategy?.move?.(next);
-	}
 
 	async viewInChat() {
 		if (!this._strategy || !this._session) {
@@ -1070,10 +1063,6 @@ export class InlineChatController implements IEditorContribution {
 		this.cancelSession();
 	}
 
-	toggleDiff() {
-		this._strategy?.toggleDiff?.();
-	}
-
 	acceptSession(): void {
 		const response = this._session?.chatModel.getRequests().at(-1)?.response;
 		if (response) {
@@ -1092,12 +1081,21 @@ export class InlineChatController implements IEditorContribution {
 		this._messages.fire(Message.ACCEPT_SESSION);
 	}
 
-	acceptHunk() {
-		return this._strategy?.acceptHunk();
+	acceptHunk(hunkInfo?: HunkInformation) {
+		return this._strategy?.performHunkAction(hunkInfo, HunkAction.Accept);
 	}
 
-	discardHunk() {
-		return this._strategy?.discardHunk();
+	discardHunk(hunkInfo?: HunkInformation) {
+		return this._strategy?.performHunkAction(hunkInfo, HunkAction.Discard);
+	}
+
+	toggleDiff(hunkInfo?: HunkInformation) {
+		return this._strategy?.performHunkAction(hunkInfo, HunkAction.ToggleDiff);
+	}
+
+	moveHunk(next: boolean) {
+		this.focus();
+		this._strategy?.performHunkAction(undefined, next ? HunkAction.MoveNext : HunkAction.MovePrev);
 	}
 
 	async cancelSession() {

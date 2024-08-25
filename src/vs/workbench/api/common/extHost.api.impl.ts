@@ -1139,17 +1139,17 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 			},
 			registerFileSearchProviderNew: (scheme: string, provider: vscode.FileSearchProviderNew) => {
 				checkProposedApiEnabled(extension, 'fileSearchProviderNew');
-				return { dispose: () => { } };
+				return extHostSearch.registerFileSearchProvider(scheme, provider);
 			},
 			registerTextSearchProviderNew: (scheme: string, provider: vscode.TextSearchProviderNew) => {
 				checkProposedApiEnabled(extension, 'textSearchProviderNew');
-				return { dispose: () => { } };
+				return extHostSearch.registerTextSearchProvider(scheme, provider);
 			},
 			registerAITextSearchProviderNew: (scheme: string, provider: vscode.AITextSearchProviderNew) => {
 				// there are some dependencies on textSearchProvider, so we need to check for both
 				checkProposedApiEnabled(extension, 'aiTextSearchProviderNew');
 				checkProposedApiEnabled(extension, 'textSearchProviderNew');
-				return { dispose: () => { } };
+				return extHostSearch.registerAITextSearchProvider(scheme, provider);
 			},
 			registerRemoteAuthorityResolver: (authorityPrefix: string, resolver: vscode.RemoteAuthorityResolver) => {
 				checkProposedApiEnabled(extension, 'resolvers');
@@ -1489,7 +1489,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 				checkProposedApiEnabled(extension, 'lmTools');
 				return extHostLanguageModelTools.registerTool(extension, toolId, tool);
 			},
-			invokeTool(toolId: string, parameters: Object, token: vscode.CancellationToken) {
+			invokeTool(toolId: string, parameters: vscode.LanguageModelToolInvocationOptions, token: vscode.CancellationToken) {
 				checkProposedApiEnabled(extension, 'lmTools');
 				return extHostLanguageModelTools.invokeTool(toolId, parameters, token);
 			},
@@ -1766,9 +1766,9 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 			ChatRequestNotebookData: extHostTypes.ChatRequestNotebookData,
 			LanguageModelChatMessageRole: extHostTypes.LanguageModelChatMessageRole,
 			LanguageModelChatMessage: extHostTypes.LanguageModelChatMessage,
-			LanguageModelChatMessageFunctionResultPart: extHostTypes.LanguageModelFunctionResultPart,
+			LanguageModelChatMessageToolResultPart: extHostTypes.LanguageModelToolResultPart,
 			LanguageModelChatResponseTextPart: extHostTypes.LanguageModelTextPart,
-			LanguageModelChatResponseFunctionUsePart: extHostTypes.LanguageModelFunctionUsePart,
+			LanguageModelChatResponseToolCallPart: extHostTypes.LanguageModelToolCallPart,
 			LanguageModelError: extHostTypes.LanguageModelError,
 			NewSymbolName: extHostTypes.NewSymbolName,
 			NewSymbolNameTag: extHostTypes.NewSymbolNameTag,
