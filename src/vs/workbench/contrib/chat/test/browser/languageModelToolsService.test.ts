@@ -31,7 +31,7 @@ suite('LanguageModelToolsService', () => {
 		const toolData: IToolData = {
 			id: 'testTool',
 			modelDescription: 'Test Tool',
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		const disposable = service.registerToolData(toolData);
@@ -44,13 +44,13 @@ suite('LanguageModelToolsService', () => {
 		const toolData: IToolData = {
 			id: 'testTool',
 			modelDescription: 'Test Tool',
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		store.add(service.registerToolData(toolData));
 
 		const toolImpl: IToolImpl = {
-			invoke: async () => ({ 'text/plain': 'result' }),
+			invoke: async () => ({ content: [{ kind: 'text', value: 'result' }] }),
 		};
 
 		store.add(service.registerToolImplementation('testTool', toolImpl));
@@ -63,20 +63,20 @@ suite('LanguageModelToolsService', () => {
 			id: 'testTool1',
 			modelDescription: 'Test Tool 1',
 			when: ContextKeyEqualsExpr.create('testKey', false),
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		const toolData2: IToolData = {
 			id: 'testTool2',
 			modelDescription: 'Test Tool 2',
 			when: ContextKeyEqualsExpr.create('testKey', true),
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		const toolData3: IToolData = {
 			id: 'testTool3',
 			modelDescription: 'Test Tool 3',
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		store.add(service.registerToolData(toolData1));
@@ -93,7 +93,7 @@ suite('LanguageModelToolsService', () => {
 		const toolData: IToolData = {
 			id: 'testTool',
 			modelDescription: 'Test Tool',
-			supportedContentTypes: []
+			displayName: 'Test Tool'
 		};
 
 		store.add(service.registerToolData(toolData));
@@ -103,7 +103,7 @@ suite('LanguageModelToolsService', () => {
 				assert.strictEqual(invocation.callId, '1');
 				assert.strictEqual(invocation.toolId, 'testTool');
 				assert.deepStrictEqual(invocation.parameters, { a: 1 });
-				return { 'text/plain': 'result' };
+				return { content: [{ kind: 'text', value: 'result' }] };
 			}
 		};
 
@@ -117,10 +117,9 @@ suite('LanguageModelToolsService', () => {
 				a: 1
 			},
 			context: undefined,
-			requestedContentTypes: ['text/plain']
 		};
 
 		const result = await service.invokeTool(dto, async () => 0, CancellationToken.None);
-		assert.strictEqual(result['text/plain'], 'result');
+		assert.strictEqual(result.content[0].value, 'result');
 	});
 });

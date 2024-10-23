@@ -150,11 +150,12 @@ export class InlineChatWidget {
 			location,
 			undefined,
 			{
+				autoScroll: true,
 				defaultElementHeight: 32,
 				renderStyle: 'minimal',
 				renderInputOnTop: false,
 				renderFollowups: true,
-				supportsFileReferences: _configurationService.getValue(`chat.experimental.variables.${location.location}`) === true,
+				supportsFileReferences: true,
 				filter: item => {
 					if (isResponseVM(item) && item.isComplete && !item.errorDetails) {
 						// filter responses that

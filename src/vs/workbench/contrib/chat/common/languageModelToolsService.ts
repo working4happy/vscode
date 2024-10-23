@@ -15,17 +15,15 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 
 export interface IToolData {
 	id: string;
-	name?: string;
+	toolReferenceName?: string;
 	icon?: { dark: URI; light?: URI } | ThemeIcon;
 	when?: ContextKeyExpression;
 	tags?: string[];
-	displayName?: string;
+	displayName: string;
 	userDescription?: string;
 	modelDescription: string;
 	parametersSchema?: IJSONSchema;
-	canBeInvokedManually?: boolean;
-	supportedContentTypes: string[];
-	requiresConfirmation?: boolean;
+	canBeReferencedInPrompt?: boolean;
 }
 
 export interface IToolInvocation {
@@ -34,7 +32,6 @@ export interface IToolInvocation {
 	parameters: Object;
 	tokenBudget?: number;
 	context: IToolInvocationContext | undefined;
-	requestedContentTypes: string[];
 }
 
 export interface IToolInvocationContext {
@@ -42,7 +39,17 @@ export interface IToolInvocationContext {
 }
 
 export interface IToolResult {
-	[contentType: string]: any;
+	content: (IToolResultPromptTsxPart | IToolResultTextPart)[];
+}
+
+export interface IToolResultPromptTsxPart {
+	kind: 'promptTsx';
+	value: unknown;
+}
+
+export interface IToolResultTextPart {
+	kind: 'text';
+	value: string;
 }
 
 export interface IToolConfirmationMessages {
@@ -57,7 +64,7 @@ export interface IPreparedToolInvocation {
 
 export interface IToolImpl {
 	invoke(invocation: IToolInvocation, countTokens: CountTokensCallback, token: CancellationToken): Promise<IToolResult>;
-	prepareToolInvocation?(participantName: string, parameters: any, token: CancellationToken): Promise<IPreparedToolInvocation | undefined>;
+	prepareToolInvocation?(parameters: any, token: CancellationToken): Promise<IPreparedToolInvocation | undefined>;
 }
 
 export const ILanguageModelToolsService = createDecorator<ILanguageModelToolsService>('ILanguageModelToolsService');
