@@ -21,8 +21,8 @@ import { IListService } from '../../../../../platform/list/browser/listService.j
 import { GroupsOrder, IEditorGroupsService } from '../../../../services/editor/common/editorGroupsService.js';
 import { IEditorService } from '../../../../services/editor/common/editorService.js';
 import { ChatAgentLocation } from '../../common/chatAgents.js';
-import { CONTEXT_CHAT_LOCATION, CONTEXT_CHAT_REQUEST_IN_PROGRESS, CONTEXT_IN_CHAT_INPUT, CONTEXT_IN_CHAT_SESSION, CONTEXT_ITEM_ID, CONTEXT_LAST_ITEM_ID, CONTEXT_REQUEST, CONTEXT_RESPONSE } from '../../common/chatContextKeys.js';
-import { applyingChatEditsContextKey, CHAT_EDITING_MULTI_DIFF_SOURCE_RESOLVER_SCHEME, chatEditingResourceContextKey, chatEditingWidgetFileStateContextKey, decidedChatEditingResourceContextKey, hasAppliedChatEditsContextKey, hasUndecidedChatEditingResourceContextKey, IChatEditingService, IChatEditingSession, isChatRequestCheckpointed, WorkingSetEntryState } from '../../common/chatEditingService.js';
+import { CONTEXT_CHAT_INPUT_HAS_TEXT, CONTEXT_CHAT_LOCATION, CONTEXT_CHAT_REQUEST_IN_PROGRESS, CONTEXT_IN_CHAT_INPUT, CONTEXT_IN_CHAT_SESSION, CONTEXT_ITEM_ID, CONTEXT_LAST_ITEM_ID, CONTEXT_REQUEST, CONTEXT_RESPONSE } from '../../common/chatContextKeys.js';
+import { applyingChatEditsContextKey, applyingChatEditsFailedContextKey, CHAT_EDITING_MULTI_DIFF_SOURCE_RESOLVER_SCHEME, chatEditingResourceContextKey, chatEditingWidgetFileStateContextKey, decidedChatEditingResourceContextKey, hasAppliedChatEditsContextKey, hasUndecidedChatEditingResourceContextKey, IChatEditingService, IChatEditingSession, isChatRequestCheckpointed, WorkingSetEntryState } from '../../common/chatEditingService.js';
 import { IChatService } from '../../common/chatService.js';
 import { isRequestVM, isResponseVM } from '../../common/chatViewModel.js';
 import { CHAT_CATEGORY } from '../actions/chatActions.js';
@@ -173,14 +173,19 @@ registerAction2(class DiscardAction extends WorkingSetAction {
 });
 
 export class ChatEditingAcceptAllAction extends Action2 {
-	static readonly ID = 'chatEditing.acceptAllFiles';
-	static readonly LABEL = localize('accept.allFiles', 'Accept All');
 
 	constructor() {
 		super({
-			id: ChatEditingAcceptAllAction.ID,
-			title: ChatEditingAcceptAllAction.LABEL,
+			id: 'chatEditing.acceptAllFiles',
+			title: localize('accept', 'Accept'),
+			icon: Codicon.check,
+			tooltip: localize('acceptAllEdits', 'Accept All Edits'),
 			precondition: ContextKeyExpr.and(CONTEXT_CHAT_REQUEST_IN_PROGRESS.negate(), hasUndecidedChatEditingResourceContextKey),
+			keybinding: {
+				primary: KeyMod.CtrlCmd | KeyCode.Enter,
+				when: ContextKeyExpr.and(CONTEXT_CHAT_REQUEST_IN_PROGRESS.negate(), hasUndecidedChatEditingResourceContextKey, CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession), CONTEXT_IN_CHAT_INPUT),
+				weight: KeybindingWeight.WorkbenchContrib,
+			},
 			menu: [
 				{
 					when: ContextKeyExpr.equals('resourceScheme', CHAT_EDITING_MULTI_DIFF_SOURCE_RESOLVER_SCHEME),
@@ -192,7 +197,7 @@ export class ChatEditingAcceptAllAction extends Action2 {
 					id: MenuId.ChatEditingWidgetToolbar,
 					group: 'navigation',
 					order: 0,
-					when: ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(hasUndecidedChatEditingResourceContextKey, ContextKeyExpr.and(CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession))))
+					when: ContextKeyExpr.and(applyingChatEditsFailedContextKey.negate(), ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(hasUndecidedChatEditingResourceContextKey, ContextKeyExpr.and(CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession)))))
 				}
 			]
 		});
@@ -210,28 +215,33 @@ export class ChatEditingAcceptAllAction extends Action2 {
 registerAction2(ChatEditingAcceptAllAction);
 
 export class ChatEditingDiscardAllAction extends Action2 {
-	static readonly ID = 'chatEditing.discardAllFiles';
-	static readonly LABEL = localize('discard.allFiles', 'Discard All');
 
 	constructor() {
 		super({
-			id: ChatEditingDiscardAllAction.ID,
-			title: ChatEditingDiscardAllAction.LABEL,
+			id: 'chatEditing.discardAllFiles',
+			title: localize('discard', 'Discard'),
+			icon: Codicon.discard,
+			tooltip: localize('discardAllEdits', 'Discard All Edits'),
 			precondition: ContextKeyExpr.and(CONTEXT_CHAT_REQUEST_IN_PROGRESS.negate(), hasUndecidedChatEditingResourceContextKey),
 			menu: [
 				{
 					when: ContextKeyExpr.equals('resourceScheme', CHAT_EDITING_MULTI_DIFF_SOURCE_RESOLVER_SCHEME),
 					id: MenuId.EditorTitle,
-					order: 2,
+					order: 1,
 					group: 'navigation',
 				},
 				{
 					id: MenuId.ChatEditingWidgetToolbar,
 					group: 'navigation',
-					order: 2,
-					when: ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession), hasUndecidedChatEditingResourceContextKey))
+					order: 1,
+					when: ContextKeyExpr.and(applyingChatEditsFailedContextKey.negate(), ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession), hasUndecidedChatEditingResourceContextKey)))
 				}
 			],
+			keybinding: {
+				when: ContextKeyExpr.and(CONTEXT_CHAT_REQUEST_IN_PROGRESS.negate(), hasUndecidedChatEditingResourceContextKey, CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession), CONTEXT_IN_CHAT_INPUT, CONTEXT_CHAT_INPUT_HAS_TEXT.negate()),
+				weight: KeybindingWeight.WorkbenchContrib,
+				primary: KeyMod.CtrlCmd | KeyCode.Backspace,
+			},
 		});
 	}
 
@@ -248,12 +258,13 @@ registerAction2(ChatEditingDiscardAllAction);
 
 export class ChatEditingShowChangesAction extends Action2 {
 	static readonly ID = 'chatEditing.viewChanges';
-	static readonly LABEL = localize('chatEditing.viewChanges', 'View Changes');
+	static readonly LABEL = localize('chatEditing.viewChanges', 'View All Edits');
 
 	constructor() {
 		super({
 			id: ChatEditingShowChangesAction.ID,
 			title: ChatEditingShowChangesAction.LABEL,
+			tooltip: ChatEditingShowChangesAction.LABEL,
 			f1: false,
 			icon: Codicon.diffMultiple,
 			precondition: hasUndecidedChatEditingResourceContextKey,
@@ -262,7 +273,7 @@ export class ChatEditingShowChangesAction extends Action2 {
 					id: MenuId.ChatEditingWidgetToolbar,
 					group: 'navigation',
 					order: 4,
-					when: ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(hasAppliedChatEditsContextKey, hasUndecidedChatEditingResourceContextKey, CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession)))
+					when: ContextKeyExpr.and(applyingChatEditsFailedContextKey.negate(), ContextKeyExpr.or(hasAppliedChatEditsContextKey.negate(), ContextKeyExpr.and(hasAppliedChatEditsContextKey, hasUndecidedChatEditingResourceContextKey, CONTEXT_CHAT_LOCATION.isEqualTo(ChatAgentLocation.EditingSession))))
 				}
 			],
 		});

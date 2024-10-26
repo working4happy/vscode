@@ -146,6 +146,7 @@ export function registerNewChatActions() {
 						title: localize('chat.startEditing.confirmation.title', "Start new editing session?"),
 						message: localize('chat.startEditing.confirmation.pending.message', "Starting a new editing session will end your current session. Do you want to discard pending edits to {0} files?", undecidedEdits.length),
 						type: 'info',
+						cancelButton: true,
 						buttons: [
 							{
 								label: localize('chat.startEditing.confirmation.discardEdits', "Discard & Continue"),
@@ -165,15 +166,6 @@ export function registerNewChatActions() {
 					});
 
 					return Boolean(result);
-				} else {
-					const result = await dialogService.confirm({
-						title: localize('chat.startEditing.confirmation.title', "Start new editing session?"),
-						message: localize('chat.startEditing.confirmation.message', "Starting a new editing session will end your current editing session and discard edits to {0} files. Do you wish to proceed?", currentEditCount),
-						type: 'info',
-						primaryButton: localize('chat.startEditing.confirmation.primaryButton', "Yes")
-					});
-
-					return result.confirmed;
 				}
 			}
 
@@ -186,6 +178,7 @@ export function registerNewChatActions() {
 			const widgetService = accessor.get(IChatWidgetService);
 			const chatEditingService = accessor.get(IChatEditingService);
 			const dialogService = accessor.get(IDialogService);
+			const viewsService = accessor.get(IViewsService);
 			if (!(await this._handleCurrentEditingSession(chatEditingService, dialogService))) {
 				return;
 			}
@@ -201,7 +194,6 @@ export function registerNewChatActions() {
 				}
 			} else {
 				// Is running from f1 or keybinding
-				const viewsService = accessor.get(IViewsService);
 				const chatView = await viewsService.openView(EDITS_VIEW_ID) as ChatViewPane;
 				const widget = chatView.widget;
 
@@ -262,8 +254,8 @@ export function registerNewChatActions() {
 	registerAction2(class UndoChatEditInteractionAction extends Action2 {
 		constructor() {
 			super({
-				id: 'workbench.action.chat.undoEditInteraction',
-				title: localize2('chat.undoEditInteraction.label', "Undo Interaction"),
+				id: 'workbench.action.chat.undoEdit',
+				title: localize2('chat.undoEdit.label', "Undo Last Edit"),
 				category: CHAT_CATEGORY,
 				icon: Codicon.discard,
 				precondition: ContextKeyExpr.and(CONTEXT_CHAT_EDITING_CAN_UNDO, CONTEXT_CHAT_ENABLED, CONTEXT_CHAT_EDITING_PARTICIPANT_REGISTERED),
@@ -294,8 +286,8 @@ export function registerNewChatActions() {
 	registerAction2(class RedoChatEditInteractionAction extends Action2 {
 		constructor() {
 			super({
-				id: 'workbench.action.chat.redoEditInteraction',
-				title: localize2('chat.redoEditInteraction.label', "Redo Interaction"),
+				id: 'workbench.action.chat.redoEdit',
+				title: localize2('chat.redoEdit.label', "Redo Last Edit"),
 				category: CHAT_CATEGORY,
 				icon: Codicon.redo,
 				precondition: ContextKeyExpr.and(CONTEXT_CHAT_EDITING_CAN_REDO, CONTEXT_CHAT_ENABLED, CONTEXT_CHAT_EDITING_PARTICIPANT_REGISTERED),
@@ -327,7 +319,7 @@ export function registerNewChatActions() {
 		constructor() {
 			super({
 				id: 'workbench.action.chat.openEditSession',
-				title: localize2('chat.openEdits.label', "Open Edit Session"),
+				title: localize2('chat.openEdits.label', "Open {0}", 'Copilot Edits'),
 				category: CHAT_CATEGORY,
 				icon: Codicon.goToEditingSession,
 				precondition: ContextKeyExpr.and(CONTEXT_CHAT_ENABLED, CONTEXT_CHAT_EDITING_PARTICIPANT_REGISTERED),
@@ -342,7 +334,15 @@ export function registerNewChatActions() {
 					when: CONTEXT_CHAT_EDITING_PARTICIPANT_REGISTERED,
 					group: 'a_chatEdit',
 					order: 1
-				}]
+				}],
+				keybinding: {
+					weight: KeybindingWeight.WorkbenchContrib,
+					primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI,
+					linux: {
+						primary: KeyMod.CtrlCmd | KeyMod.Alt | KeyMod.Shift | KeyCode.KeyI
+					},
+					when: ContextKeyExpr.and(ContextKeyExpr.notEquals('view', EDITS_VIEW_ID), CONTEXT_CHAT_EDITING_PARTICIPANT_REGISTERED)
+				}
 			});
 		}
 
