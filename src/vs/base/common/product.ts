@@ -100,6 +100,7 @@ export interface IProductConfiguration {
 		readonly itemUrl: string;
 		readonly publisherUrl: string;
 		readonly resourceUrlTemplate: string;
+		readonly extensionUrlTemplate: string;
 		readonly controlUrl: string;
 		readonly nlsBaseUrl: string;
 	};
@@ -317,6 +318,8 @@ export interface IGitHubEntitlement {
 	entitlementUrl: string;
 	extensionId: string;
 	enablementKey: string;
+	trialKey: string;
+	trialValue: string;
 	confirmationMessage: string;
 	confirmationAction: string;
 }
