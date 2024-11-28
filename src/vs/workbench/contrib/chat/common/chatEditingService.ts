@@ -36,13 +36,15 @@ export interface IChatEditingService {
 
 	readonly editingSessionFileLimit: number;
 
-	startOrContinueEditingSession(chatSessionId: string, options?: { silent: boolean }): Promise<IChatEditingSession>;
-	getEditingSession(resource: URI): IChatEditingSession | null;
+	startOrContinueEditingSession(chatSessionId: string): Promise<IChatEditingSession>;
+	getOrRestoreEditingSession(): Promise<IChatEditingSession | null>;
 	createSnapshot(requestId: string): void;
 	getSnapshotUri(requestId: string, uri: URI): URI | undefined;
 	restoreSnapshot(requestId: string | undefined): Promise<void>;
 
+	hasRelatedFilesProviders(): boolean;
 	registerRelatedFilesProvider(handle: number, provider: IChatRelatedFilesProvider): IDisposable;
+	getRelatedFiles(chatSessionId: string, prompt: string, token: CancellationToken): Promise<{ group: string; files: IChatRelatedFile[] }[] | undefined>;
 }
 
 export interface IChatRequestDraft {
@@ -50,31 +52,48 @@ export interface IChatRequestDraft {
 	readonly files: readonly URI[];
 }
 
-export interface IChatRelatedFilesProvider {
-	provideRelatedFiles(chatRequest: IChatRequestDraft, token: CancellationToken): Promise<URI[] | undefined>;
+export interface IChatRelatedFileProviderMetadata {
+	readonly description: string;
 }
+
+export interface IChatRelatedFile {
+	readonly uri: URI;
+	readonly description: string;
+}
+
+export interface IChatRelatedFilesProvider {
+	readonly description: string;
+	provideRelatedFiles(chatRequest: IChatRequestDraft, token: CancellationToken): Promise<IChatRelatedFile[] | undefined>;
+}
+
+export interface WorkingSetDisplayMetadata { state: WorkingSetEntryState; description?: string }
 
 export interface IChatEditingSession {
 	readonly chatSessionId: string;
-	readonly onDidChange: Event<void>;
+	readonly onDidChange: Event<ChatEditingSessionChangeType>;
 	readonly onDidDispose: Event<void>;
 	readonly state: IObservable<ChatEditingSessionState>;
 	readonly entries: IObservable<readonly IModifiedFileEntry[]>;
-	readonly hiddenRequestIds: IObservable<readonly string[]>;
-	readonly workingSet: ResourceMap<WorkingSetEntryState>;
+	readonly workingSet: ResourceMap<WorkingSetDisplayMetadata>;
 	readonly isVisible: boolean;
-	addFileToWorkingSet(uri: URI): void;
+	addFileToWorkingSet(uri: URI, description?: string, kind?: WorkingSetEntryState.Transient | WorkingSetEntryState.Suggested): void;
 	show(): Promise<void>;
-	remove(...uris: URI[]): void;
+	remove(reason: WorkingSetEntryRemovalReason, ...uris: URI[]): void;
 	accept(...uris: URI[]): Promise<void>;
 	reject(...uris: URI[]): Promise<void>;
+	getEntry(uri: URI): IModifiedFileEntry | undefined;
 	/**
 	 * Will lead to this object getting disposed
 	 */
-	stop(): Promise<void>;
+	stop(clearState?: boolean): Promise<void>;
 
 	undoInteraction(): Promise<void>;
 	redoInteraction(): Promise<void>;
+}
+
+export const enum WorkingSetEntryRemovalReason {
+	User,
+	Programmatic
 }
 
 export const enum WorkingSetEntryState {
@@ -83,7 +102,13 @@ export const enum WorkingSetEntryState {
 	Rejected,
 	Transient,
 	Attached,
-	Sent,
+	Sent, // TODO@joyceerhl remove this
+	Suggested,
+}
+
+export const enum ChatEditingSessionChangeType {
+	WorkingSet,
+	Other,
 }
 
 export interface IModifiedFileEntry {

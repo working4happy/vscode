@@ -21,13 +21,15 @@ import { AbstractEditContext } from '../editContext.js';
 import { editContextAddDisposableListener, FocusTracker, ITypeData } from './nativeEditContextUtils.js';
 import { ScreenReaderSupport } from './screenReaderSupport.js';
 import { Range } from '../../../../common/core/range.js';
-import { Selection } from '../../../../common/core/selection.js';
+import { Selection, SelectionDirection } from '../../../../common/core/selection.js';
 import { Position } from '../../../../common/core/position.js';
 import { IVisibleRangeProvider } from '../textArea/textAreaEditContext.js';
 import { PositionOffsetTransformer } from '../../../../common/core/positionToOffset.js';
 import { IDisposable, MutableDisposable } from '../../../../../base/common/lifecycle.js';
 import { EditContext } from './editContextFactory.js';
 import { IAccessibilityService } from '../../../../../platform/accessibility/common/accessibility.js';
+import { NativeEditContextRegistry } from './nativeEditContextRegistry.js';
+import { IEditorAriaOptions } from '../../../editorBrowser.js';
 
 // Corresponds to classes in nativeEditContext.css
 enum CompositionClassName {
@@ -37,8 +39,6 @@ enum CompositionClassName {
 }
 
 export class NativeEditContext extends AbstractEditContext {
-
-	public static TEXT_AREA_CLASS_NAME = 'native-edit-context-textarea';
 
 	// Text area used to handle paste events
 	public readonly textArea: FastDomNode<HTMLTextAreaElement>;
@@ -60,6 +60,7 @@ export class NativeEditContext extends AbstractEditContext {
 	private readonly _selectionChangeListener: MutableDisposable<IDisposable>;
 
 	constructor(
+		ownerID: string,
 		context: ViewContext,
 		overflowGuardContainer: FastDomNode<HTMLElement>,
 		viewController: ViewController,
@@ -72,8 +73,10 @@ export class NativeEditContext extends AbstractEditContext {
 		this.domNode = new FastDomNode(document.createElement('div'));
 		this.domNode.setClassName(`native-edit-context`);
 		this.textArea = new FastDomNode(document.createElement('textarea'));
-		this.textArea.setClassName(NativeEditContext.TEXT_AREA_CLASS_NAME);
-		this.textArea.setAttribute('modeluri', context.viewModel.model.uri.path);
+		this.textArea.setClassName('native-edit-context-textarea');
+
+		this._register(NativeEditContextRegistry.registerTextArea(ownerID, this.textArea.domNode));
+
 		this._updateDomAttributes();
 
 		overflowGuardContainer.appendChild(this.domNode);
@@ -165,11 +168,12 @@ export class NativeEditContext extends AbstractEditContext {
 		// Force blue the dom node so can write in pane with no native edit context after disposal
 		this.domNode.domNode.blur();
 		this.domNode.domNode.remove();
+		this.textArea.domNode.remove();
 		super.dispose();
 	}
 
-	public setAriaOptions(): void {
-		this._screenReaderSupport.setAriaOptions();
+	public setAriaOptions(options: IEditorAriaOptions): void {
+		this._screenReaderSupport.setAriaOptions(options);
 	}
 
 	/* Last rendered data needed for correct hit-testing and determining the mouse position.
@@ -470,11 +474,14 @@ export class NativeEditContext extends AbstractEditContext {
 				return;
 			}
 			const range = activeDocumentSelection.getRangeAt(0);
-			const model = this._context.viewModel.model;
-			const offsetOfStartOfScreenReaderContent = model.getOffsetAt(screenReaderContentState.startPositionWithinEditor);
+			const viewModel = this._context.viewModel;
+			const model = viewModel.model;
+			const coordinatesConverter = viewModel.coordinatesConverter;
+			const modelScreenReaderContentStartPositionWithinEditor = coordinatesConverter.convertViewPositionToModelPosition(screenReaderContentState.startPositionWithinEditor);
+			const offsetOfStartOfScreenReaderContent = model.getOffsetAt(modelScreenReaderContentStartPositionWithinEditor);
 			let offsetOfSelectionStart = range.startOffset + offsetOfStartOfScreenReaderContent;
 			let offsetOfSelectionEnd = range.endOffset + offsetOfStartOfScreenReaderContent;
-			const modelUsesCRLF = this._context.viewModel.model.getEndOfLineSequence() === EndOfLineSequence.CRLF;
+			const modelUsesCRLF = model.getEndOfLineSequence() === EndOfLineSequence.CRLF;
 			if (modelUsesCRLF) {
 				const screenReaderContentText = screenReaderContentState.value;
 				const offsetTransformer = new PositionOffsetTransformer(screenReaderContentText);
@@ -485,7 +492,13 @@ export class NativeEditContext extends AbstractEditContext {
 			}
 			const positionOfSelectionStart = model.getPositionAt(offsetOfSelectionStart);
 			const positionOfSelectionEnd = model.getPositionAt(offsetOfSelectionEnd);
-			const newSelection = Selection.fromPositions(positionOfSelectionStart, positionOfSelectionEnd);
+			const currentSelection = this._context.viewModel.getPrimaryCursorState().modelState.selection;
+			const newSelection = currentSelection.getDirection() === SelectionDirection.LTR ?
+				Selection.fromPositions(positionOfSelectionStart, positionOfSelectionEnd) :
+				Selection.fromPositions(positionOfSelectionEnd, positionOfSelectionStart);
+			if (newSelection.equalsSelection(currentSelection)) {
+				return;
+			}
 			viewController.setSelection(newSelection);
 		});
 	}
