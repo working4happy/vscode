@@ -2038,13 +2038,7 @@
           "group": "9_copy@2"
         }
       ],
-      "scm/historyItemRef/context": [
-        {
-          "command": "git.checkoutRef",
-          "when": "scmProvider == git",
-          "group": "1_checkout@1"
-        }
-      ],
+      "scm/historyItemRef/context": [],
       "editor/title": [
         {
           "command": "git.openFile",
@@ -3235,7 +3229,7 @@
         },
         "git.blame.statusBarItem.template": {
           "type": "string",
-          "default": "$(git-commit) ${authorName} (${authorDateAgo})",
+          "default": "${authorName} (${authorDateAgo})",
           "markdownDescription": "%config.blameStatusBarItem.template%",
           "scope": "resource",
           "tags": [

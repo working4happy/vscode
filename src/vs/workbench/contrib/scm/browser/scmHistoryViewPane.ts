@@ -1321,8 +1321,8 @@ export class SCMHistoryViewPane extends ViewPane {
 				const historyItemRefId = derived(reader => {
 					return historyProvider.historyItemRef.read(reader)?.id;
 				});
-				store.add(runOnChange(historyItemRefId, historyItemRefIdValue => {
-					this.refresh();
+				store.add(runOnChange(historyItemRefId, async historyItemRefIdValue => {
+					await this.refresh();
 
 					// Update context key (needs to be done after the refresh call)
 					this._scmCurrentHistoryItemRefInFilter.set(this._isCurrentHistoryItemInFilter(historyItemRefIdValue));
@@ -1348,8 +1348,8 @@ export class SCMHistoryViewPane extends ViewPane {
 				}));
 
 				// HistoryItemRefs filter changed
-				store.add(runOnChange(this._treeViewModel.onDidChangeHistoryItemsFilter, () => {
-					this.refresh();
+				store.add(runOnChange(this._treeViewModel.onDidChangeHistoryItemsFilter, async () => {
+					await this.refresh();
 
 					// Update context key (needs to be done after the refresh call)
 					this._scmCurrentHistoryItemRefInFilter.set(this._isCurrentHistoryItemInFilter(historyItemRefId.get()));
@@ -1460,7 +1460,7 @@ export class SCMHistoryViewPane extends ViewPane {
 			return;
 		}
 
-		if (this._isCurrentHistoryItemInFilter(historyItemRef.id)) {
+		if (!this._isCurrentHistoryItemInFilter(historyItemRef.id)) {
 			return;
 		}
 
@@ -1572,7 +1572,7 @@ export class SCMHistoryViewPane extends ViewPane {
 			return;
 		}
 
-		const historyItemMenuActions = this._menuService.getMenuActions(MenuId.SCMChangesContext, this.contextKeyService, {
+		const historyItemMenuActions = this._menuService.getMenuActions(MenuId.SCMChangesContext, this.scopedContextKeyService, {
 			arg: element.repository.provider,
 			shouldForwardArgs: true
 		});
@@ -1584,7 +1584,7 @@ export class SCMHistoryViewPane extends ViewPane {
 
 		const that = this;
 		for (const ref of element.historyItemViewModel.historyItem.references ?? []) {
-			const contextKeyService = this.contextKeyService.createOverlay([
+			const contextKeyService = this.scopedContextKeyService.createOverlay([
 				['scmHistoryItemRef', ref.id]
 			]);
 
@@ -1603,7 +1603,9 @@ export class SCMHistoryViewPane extends ViewPane {
 					}
 				});
 
-			actions.push(new SubmenuAction(`scm.historyItemRef.${ref.id}`, ref.name, historyItemRefSubMenuActions));
+			if (historyItemRefSubMenuActions.length > 0) {
+				actions.push(new SubmenuAction(`scm.historyItemRef.${ref.id}`, ref.name, historyItemRefSubMenuActions));
+			}
 		}
 
 		this.contextMenuService.showContextMenu({
